@@ -8,62 +8,21 @@ import CheckoutForm from '@/components/CheckoutForm';
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
-interface EnvStatus {
-  STRIPE_SECRET_KEY: boolean;
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: boolean;
-  STRIPE_WEBHOOK_SECRET: boolean;
-}
-
 export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [envStatus, setEnvStatus] = useState<EnvStatus | null>(null);
-  const [envLoading, setEnvLoading] = useState(true);
 
-  // Check env vars
+  // Log client-side env check
   useEffect(() => {
-    // Client-side checks
     console.log(
       '[ENV CHECK] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:',
       stripePublishableKey ? '✅ SET' : '❌ MISSING'
     );
-
-    // Server-side checks via API
-    fetch('/api/stripe/check-env')
-      .then(async (res) => {
-        const data = await res.json();
-        // Override the publishable key check with actual client-side value
-        data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = !!stripePublishableKey;
-
-        console.log('[ENV CHECK] STRIPE_SECRET_KEY:', data.STRIPE_SECRET_KEY ? '✅ SET' : '❌ MISSING');
-        console.log('[ENV CHECK] STRIPE_WEBHOOK_SECRET:', data.STRIPE_WEBHOOK_SECRET ? '✅ SET' : '❌ MISSING');
-
-        setEnvStatus(data);
-      })
-      .catch(() => {
-        setEnvStatus({
-          STRIPE_SECRET_KEY: false,
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: !!stripePublishableKey,
-          STRIPE_WEBHOOK_SECRET: false,
-        });
-      })
-      .finally(() => {
-        setEnvLoading(false);
-      });
   }, []);
 
-  const allEnvSet = envStatus
-    ? envStatus.STRIPE_SECRET_KEY && envStatus.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-    : false;
-
-  // Create payment intent only when env is confirmed OK
+  // Create payment intent immediately
   useEffect(() => {
-    if (envLoading || !allEnvSet) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     fetch('/api/stripe/create-payment-intent', {
       method: 'POST',
@@ -86,7 +45,7 @@ export default function CheckoutPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [envLoading, allEnvSet]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -108,40 +67,6 @@ export default function CheckoutPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        {/* Env Status Banner */}
-        {!envLoading && envStatus && (
-          <div className="mb-8 bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Environment Variables Status</h3>
-            <div className="space-y-3">
-              <EnvRow
-                name="NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
-                isSet={envStatus.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-                required
-              />
-              <EnvRow
-                name="STRIPE_SECRET_KEY"
-                isSet={envStatus.STRIPE_SECRET_KEY}
-                required
-              />
-              <EnvRow
-                name="STRIPE_WEBHOOK_SECRET"
-                isSet={envStatus.STRIPE_WEBHOOK_SECRET}
-                required={false}
-              />
-            </div>
-            {!allEnvSet && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-sm text-amber-800">
-                  <strong>⚠️ Required env vars are missing.</strong> The payment button is disabled until{' '}
-                  <code className="bg-amber-100 px-1 py-0.5 rounded text-xs">STRIPE_SECRET_KEY</code> and{' '}
-                  <code className="bg-amber-100 px-1 py-0.5 rounded text-xs">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>{' '}
-                  are set.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Order Summary */}
           <div>
@@ -206,37 +131,14 @@ export default function CheckoutPage() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Payment Details</h3>
 
-              {(loading || envLoading) && (
+              {loading && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                   <p className="mt-3 text-sm text-gray-500">Preparing checkout...</p>
                 </div>
               )}
 
-              {!loading && !envLoading && !allEnvSet && (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900">Stripe not fully configured</p>
-                  <p className="mt-1 text-sm text-gray-500 text-center max-w-xs">
-                    Set the required environment variables above to enable payments.
-                  </p>
-                  <button
-                    disabled
-                    className="mt-6 w-full px-6 py-3.5 text-base font-semibold text-white bg-indigo-600 rounded-xl opacity-50 cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                    </svg>
-                    Pay $29.00
-                  </button>
-                </div>
-              )}
-
-              {error && !loading && allEnvSet && (
+              {error && !loading && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -250,7 +152,7 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {clientSecret && stripePromise && allEnvSet && (
+              {clientSecret && stripePromise && (
                 <Elements
                   stripe={stripePromise}
                   options={{
@@ -268,38 +170,23 @@ export default function CheckoutPage() {
                   <CheckoutForm />
                 </Elements>
               )}
+
+              {!loading && !error && !clientSecret && !stripePromise && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">Stripe not configured</p>
+                  <p className="mt-1 text-sm text-gray-500 text-center max-w-xs">
+                    Please ensure <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> is set.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function EnvRow({ name, isSet, required }: { name: string; isSet: boolean; required: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-800">{name}</code>
-        {required && (
-          <span className="text-xs font-medium text-red-500">required</span>
-        )}
-        {!required && (
-          <span className="text-xs font-medium text-gray-400">optional</span>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5">
-        {isSet ? (
-          <>
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-xs font-medium text-green-700">Set</span>
-          </>
-        ) : (
-          <>
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span className="text-xs font-medium text-red-700">Missing</span>
-          </>
-        )}
       </div>
     </div>
   );
