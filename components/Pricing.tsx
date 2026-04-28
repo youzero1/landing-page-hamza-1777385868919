@@ -12,6 +12,7 @@ const plans = [
       '100 builds/month',
     ],
     cta: 'Get Started Free',
+    href: '#',
     popular: false,
   },
   {
@@ -28,7 +29,8 @@ const plans = [
       'Custom domains',
       'SSO & RBAC',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Buy Now — $29',
+    href: '/checkout',
     popular: true,
   },
   {
@@ -46,6 +48,7 @@ const plans = [
       'Audit logs',
     ],
     cta: 'Contact Sales',
+    href: '#',
     popular: false,
   },
 ];
@@ -98,7 +101,7 @@ export default function Pricing() {
               </ul>
 
               <a
-                href="#"
+                href={plan.href}
                 className={`mt-8 inline-flex items-center justify-center px-6 py-3 text-sm font-semibold rounded-xl transition-colors ${
                   plan.popular
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-500/25'
